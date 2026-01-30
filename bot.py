@@ -18,20 +18,20 @@ HEADERS = {
 def to_float(num_str: str) -> float:
     return float(num_str.replace(",", "").strip())
 
+GOLDPRICE_URL = "https://goldprice.org/"
+NBU_USD_URL = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json"
+
+GOLDPRICE_API_USD = "https://data-asg.goldprice.org/dbXRates/USD"
+TROY_OUNCE_GRAMS = 31.1034768
+
 def fetch_gold_usd_per_gram() -> float:
-    r = requests.get(GOLDPRICE_URL, headers=HEADERS, timeout=30)
+    r = requests.get(GOLDPRICE_API_USD, headers=HEADERS, timeout=30)
     r.raise_for_status()
+    data = r.json()
 
-    m = re.search(r"Gold Price per Gram:\s*([\d,]+(?:\.\d+)?)", r.text, re.IGNORECASE)
-    if not m:
-        raise RuntimeError("Не знайшов 'Gold Price per Gram' на goldprice.org")
+    xau_oz_usd = float(data["items"][0]["xauPrice"])  # USD за 1 тройську унцію
+    return xau_oz_usd / TROY_OUNCE_GRAMS  # USD за 1 грам
 
-    val = to_float(m.group(1))
-
-    # sanity-check для USD/gram (орієнтовно десятки-сотні)
-    if not (10 <= val <= 500):
-        raise RuntimeError(f"Підозріле значення Gold Price per Gram: {val}. Можливо, не USD.")
-    return val
 
 def fetch_usd_uah_rate_nbu() -> float:
     r = requests.get(NBU_USD_URL, headers=HEADERS, timeout=30)
