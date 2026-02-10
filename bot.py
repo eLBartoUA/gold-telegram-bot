@@ -43,20 +43,26 @@ def build_post(uah_per_gram_999: float, discount: float, manager: str) -> str:
     buy_uah_999 = uah_per_gram_999 * (1.0 - discount)
     date_str = datetime.now(UA_TZ).strftime("%d.%m.%Y")
 
-    lines = [f"Орієнтовна ціна брухт ЗОЛОТА на {date_str}\n"]
+    lines = [
+        f"Орієнтовна ціна брухт  ЗОЛОТА на {date_str}",
+        "",
+    ]
+
     for assay in ASSAYS:
         price = buy_uah_999 * (assay / 999.0)
         lines.append(f"🔸{assay} — {int(round(price))} грн/г")
 
     lines += [
+        "",
         "❗️Актуальна ціна залежить від виробу, стану , якості❗️",
         "💰Для отримання актуальної та найкращої  ціни зверніться до менеджера",
         "",
-        f"для звʼязку з менеджером {manager}\n",
+        f"Для звʼязку з менеджером {manager}",
+        "",
         "#золото #викуп #ціназолота",
     ]
-    return "\n".join(lines)
 
+    return "\n".join(lines)
 def send_to_telegram(token: str, chat_id: str, text: str) -> None:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     resp = requests.post(url, json={
