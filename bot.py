@@ -25,12 +25,23 @@ GOLDPRICE_API_USD = "https://data-asg.goldprice.org/dbXRates/USD"
 TROY_OUNCE_GRAMS = 31.1034768
 
 def fetch_gold_usd_per_gram() -> float:
-    r = requests.get(GOLDPRICE_API_USD, headers=HEADERS, timeout=30)
+    r = requests.get(GOLDPRICE_TODAY_URL, headers=HEADERS, timeout=30)
     r.raise_for_status()
-    data = r.json()
+    html = r.text
 
-    xau_oz_usd = float(data["items"][0]["xauPrice"])  # USD за 1 тройську унцію
-    return xau_oz_usd / TROY_OUNCE_GRAMS  # USD за 1 грам
+    # На сторінці є рядок типу: Gold Price ... 5345.64 -38.66 ...
+    patterns = [
+        r"Gold Price[^0-9]{0,80}([0-9][0-9,]*(?:\.[0-9]+)?)\s*[+-]",
+        r"Gold Price\s*</a>\s*([0-9][0-9,]*(?:\.[0-9]+)?)",
+    ]
+
+    for pat in patterns:
+        m = re.search(pat, html, re.IGNORECASE)
+        if m:
+            usd_per_oz = float(m.group(1).replace(",", ""))
+            return usd_per_oz / TROY_OUNCE_GRAMS  # USD за 1 грам
+
+    raise RuntimeError("Не зміг витягнути Gold Price зі сторінки gold-price-today")
 
 
 def fetch_usd_uah_rate_nbu() -> float:
