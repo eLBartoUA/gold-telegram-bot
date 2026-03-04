@@ -6,6 +6,8 @@ from zoneinfo import ZoneInfo
 
 GOLDPRICE_URL = "https://goldprice.org/"  # золото ТІЛЬКИ звідси
 NBU_USD_URL = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json"
+GOLDPRICE_TODAY_URL = "https://goldprice.org/gold-price-today"
+TROY_OUNCE_GRAMS = 31.1034768
 
 ASSAYS = [999, 750, 585, 550, 375]
 UA_TZ = ZoneInfo("Europe/Uzhgorod")
