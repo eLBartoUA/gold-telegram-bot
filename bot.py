@@ -37,23 +37,24 @@ def fetch_gold_usd_per_gram() -> float:
     r.raise_for_status()
     html = r.text
 
-    patterns = [
-        # Витягує число після "Gold Price", якщо поруч є + або -
-        r"Gold Price[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)\s*[+-]",
-        # fallback: якщо знаку +/- нема
-        r"Gold Price[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)",
-    ]
+    # прибираємо script/style (там купа чисел) і всі HTML-теги
+    cleaned = re.sub(r"(?is)<script.*?>.*?</script>", " ", html)
+    cleaned = re.sub(r"(?is)<style.*?>.*?</style>", " ", cleaned)
+    cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    for pat in patterns:
-        m = re.search(pat, html, re.IGNORECASE | re.DOTALL)
-        if m:
-            usd_per_oz = float(m.group(1).replace(",", ""))
+    # ловимо саме рядок: "Gold Price 5345.64 -38.66 -0.72%"
+    m = re.search(
+        r"\bGold Price\b(?!\s*Today)\s+([0-9][0-9,]*\.[0-9]+)\s+"
+        r"[+-][0-9][0-9,]*\.[0-9]+\s+[+-]?[0-9][0-9,]*\.[0-9]+%",
+        cleaned,
+        re.IGNORECASE
+    )
+    if not m:
+        raise RuntimeError("Не зміг витягнути Gold Price з gold-price-today")
 
-            # sanity-check: ціна золота за унцію зазвичай в цьому діапазоні
-            if 500 < usd_per_oz < 20000:
-                return usd_per_oz / TROY_OUNCE_GRAMS  # USD за 1 грам
-
-    raise RuntimeError("Не зміг витягнути Gold Price зі сторінки gold-price-today")
+    usd_per_oz = float(m.group(1).replace(",", ""))
+    return usd_per_oz / TROY_OUNCE_GRAMS
 
 def fetch_usd_uah_rate_nbu() -> float:
     r = requests.get(NBU_USD_URL, headers=HEADERS, timeout=30)
