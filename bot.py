@@ -26,24 +26,39 @@ NBU_USD_URL = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valc
 GOLDPRICE_API_USD = "https://data-asg.goldprice.org/dbXRates/USD"
 TROY_OUNCE_GRAMS = 31.1034768
 
+GOLDPRICE_TODAY_URL = "https://goldprice.org/gold-price-today"
+TROY_OUNCE_GRAMS = 31.1034768
+
 def fetch_gold_usd_per_gram() -> float:
-    r = requests.get(GOLDPRICE_TODAY_URL, headers=HEADERS, timeout=30)
+    r = requests.get(
+        GOLDPRICE_TODAY_URL,
+        headers={**HEADERS, "Referer": "https://goldprice.org/"},
+        timeout=30
+    )
     r.raise_for_status()
     html = r.text
 
-    # На сторінці є рядок типу: Gold Price ... 5345.64 -38.66 ...
-    patterns = [
-        r"Gold Price[^0-9]{0,80}([0-9][0-9,]*(?:\.[0-9]+)?)\s*[+-]",
-        r"Gold Price\s*</a>\s*([0-9][0-9,]*(?:\.[0-9]+)?)",
-    ]
+    # Вирізаємо шматок після заголовка, щоб не зловити “ліві” числа
+    low = html.lower()
+    i = low.find("gold price today")
+    chunk = html[i:i+15000] if i != -1 else html
 
-    for pat in patterns:
-        m = re.search(pat, html, re.IGNORECASE)
-        if m:
-            usd_per_oz = float(m.group(1).replace(",", ""))
-            return usd_per_oz / TROY_OUNCE_GRAMS  # USD за 1 грам
+    # Точний матч саме рядка: Gold Price 5345.64 -38.66 ...
+    m = re.search(
+        r">\\s*Gold Price\\s*</a>\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*[+-]",
+        chunk,
+        re.IGNORECASE
+    )
+    if not m:
+        raise RuntimeError("Не зміг витягнути Gold Price з gold-price-today")
 
-    raise RuntimeError("Не зміг витягнути Gold Price зі сторінки gold-price-today")
+    usd_per_oz = float(m.group(1).replace(",", ""))
+
+    # sanity-check (щоб не взяло випадкове число)
+    if not (500 < usd_per_oz < 20000):
+        raise RuntimeError(f"Підозрілий Gold Price (oz): {usd_per_oz}")
+
+    return usd_per_oz / TROY_OUNCE_GRAMS
 
 
 def fetch_usd_uah_rate_nbu() -> float:
