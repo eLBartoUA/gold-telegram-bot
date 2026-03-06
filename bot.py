@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -29,32 +30,55 @@ GOLDPRICE_TODAY_URL = "https://goldprice.org/gold-price-today"
 TROY_OUNCE_GRAMS = 31.1034768
 
 def fetch_gold_usd_per_gram() -> float:
-    r = requests.get(
-        GOLDPRICE_TODAY_URL,
-        headers={**HEADERS, "Referer": "https://goldprice.org/"},
-        timeout=30
-    )
-    r.raise_for_status()
-    html = r.text
+    last_err = None
 
-    # прибираємо script/style (там купа чисел) і всі HTML-теги
-    cleaned = re.sub(r"(?is)<script.*?>.*?</script>", " ", html)
-    cleaned = re.sub(r"(?is)<style.*?>.*?</style>", " ", cleaned)
-    cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    for attempt in range(1, 4):  # 3 спроби
+        try:
+            r = requests.get(
+                GOLDPRICE_TODAY_URL,
+                headers={**HEADERS, "Referer": "https://goldprice.org/"},
+                timeout=30
+            )
+            r.raise_for_status()
+            html = r.text
 
-    # ловимо саме рядок: "Gold Price 5345.64 -38.66 -0.72%"
-    m = re.search(
-        r"\bGold Price\b(?!\s*Today)\s+([0-9][0-9,]*\.[0-9]+)\s+"
-        r"[+-][0-9][0-9,]*\.[0-9]+\s+[+-]?[0-9][0-9,]*\.[0-9]+%",
-        cleaned,
-        re.IGNORECASE
-    )
-    if not m:
-        raise RuntimeError("Не зміг витягнути Gold Price з gold-price-today")
+            # Якщо раптом прилетіла антибот сторінка
+            low = html.lower()
+            if "attention required" in low or "cloudflare" in low or "access denied" in low:
+                raise RuntimeError("Goldprice віддав anti-bot сторінку")
 
-    usd_per_oz = float(m.group(1).replace(",", ""))
-    return usd_per_oz / TROY_OUNCE_GRAMS
+            # чистимо html → текст
+            cleaned = re.sub(r"(?is)<script.*?>.*?</script>", " ", html)
+            cleaned = re.sub(r"(?is)<style.*?>.*?</style>", " ", cleaned)
+            cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+            # Шукаємо всі кандидати після 'Gold Price' (але не 'Gold Price Today')
+            # Беремо тільки числа з десятковою частиною, щоб не зловити "2026"
+            candidates = re.findall(
+                r"\bGold Price\b(?!\s*Today).{0,120}?([0-9][0-9,]*\.[0-9]+)",
+                cleaned,
+                flags=re.IGNORECASE
+            )
+
+            vals = []
+            for c in candidates:
+                v = float(c.replace(",", ""))
+                # реалістичний діапазон $/oz
+                if 1000 < v < 20000:
+                    vals.append(v)
+
+            if not vals:
+                raise RuntimeError("Не знайшов валідну ціну Gold Price у тексті сторінки")
+
+            usd_per_oz = max(vals)  # на практиці це і є spot (напр. 5345.64)
+            return usd_per_oz / TROY_OUNCE_GRAMS  # USD за 1 грам
+
+        except Exception as e:
+            last_err = e
+            time.sleep(3 * attempt)  # 3с, 6с, 9с
+
+    raise RuntimeError(f"Не зміг витягнути Gold Price з gold-price-today: {last_err}")
 
 def fetch_usd_uah_rate_nbu() -> float:
     r = requests.get(NBU_USD_URL, headers=HEADERS, timeout=30)
