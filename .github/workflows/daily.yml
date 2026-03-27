@@ -1,0 +1,30 @@
+name: Daily Gold Price to Telegram
+
+on:
+  schedule:
+    # Щодня о 08:00 UTC (11:00 за Києвом влітку / 10:00 взимку)
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MANAGER_HANDLE: ${{ secrets.MANAGER_HANDLE }}
+          DISCOUNT: ${{ secrets.DISCOUNT }}
+        run: python bot.py
